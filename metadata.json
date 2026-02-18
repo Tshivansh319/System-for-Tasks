@@ -1,0 +1,8 @@
+{
+  "name": "Solo Leveling System",
+  "description": "A gamified productivity system for daily growth and discipline tracking with a futuristic HUD interface.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
