@@ -118,10 +118,10 @@ const App: React.FC = () => {
     ? 'repeat(1, minmax(0, 1fr))' 
     : `repeat(${columns}, minmax(0, 1fr))`;
 
-  // Decreased text sizes for mobile specifically
-  let textSize = 'text-[10px] sm:text-[13px]';
-  if (columns === 2) textSize = 'text-[9px] sm:text-[12px]';
-  if (columns >= 3) textSize = 'text-[8px] sm:text-[11px]';
+  // SIGNIFICANTLY decreased text sizes for mobile as requested
+  let textSize = 'text-[7px] sm:text-[13px]';
+  if (columns === 2) textSize = 'text-[6px] sm:text-[12px]';
+  if (columns >= 3) textSize = 'text-[5px] sm:text-[11px]';
 
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center relative overflow-hidden p-2">
@@ -203,24 +203,23 @@ const App: React.FC = () => {
                   gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
                   gridAutoFlow: 'column',
                   gridTemplateColumns: gridTemplateColumns,
-                  gap: '4px 10px', // Tighter gaps on mobile
+                  gap: '2px 8px', // Tighter gaps for micro text
                   justifyContent: 'center'
                 }}
               >
                 {allQuests.map((quest) => (
-                  <label key={quest.id} className="quest-row flex items-center gap-3 sm:gap-4 cursor-pointer group">
+                  <label key={quest.id} className="quest-row flex items-center gap-2 sm:gap-4 cursor-pointer group">
                     <input 
                       type="checkbox" 
                       checked={quest.completed}
                       onChange={() => store.toggleQuest(quest.id, quest.type)}
                       className="hidden"
                     />
-                    <div className={`checkbox-hud flex-shrink-0 ${quest.completed ? 'checked' : ''}`}>
-                      {/* FIXED: Removed non-existent 'sm:size' prop from Check component */}
-                      {quest.completed && <Check className="text-white drop-shadow-[0_0_5px_#fff]" size={14} strokeWidth={4} />}
+                    <div className={`checkbox-hud flex-shrink-0 ${quest.completed ? 'checked' : ''}`} style={{ width: '14px', height: '14px' }}>
+                      {quest.completed && <Check className="text-white drop-shadow-[0_0_5px_#fff]" size={10} strokeWidth={4} />}
                     </div>
-                    <span className={`${textSize} font-bold tracking-[0.05em] sm:tracking-[0.1em] uppercase transition-all truncate-hud flex-1 ${
-                      quest.completed ? 'text-zinc-600 line-through' : 'text-zinc-200 group-hover:text-cyan-400'
+                    <span className={`${textSize} font-bold tracking-[0.02em] sm:tracking-[0.1em] uppercase transition-all truncate-hud flex-1 ${
+                      quest.completed ? 'text-zinc-700 line-through' : 'text-zinc-200 group-hover:text-cyan-400'
                     }`}>
                       {quest.title}
                     </span>
@@ -289,7 +288,6 @@ const App: React.FC = () => {
         onClick={() => setShowProgressChart(true)}
         className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 system-panel border-2 border-cyan-500/60 hover:border-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.2)] group bg-zinc-950/40"
       >
-        {/* FIXED: Removed non-existent 'sm:size' prop from TrendingUp component */}
         <TrendingUp className="text-cyan-400 group-hover:scale-125 transition-transform" size={18} />
         <span className="font-orbitron text-[9px] sm:text-[10px] font-black text-cyan-400 tracking-[0.3em] sm:tracking-[0.4em] uppercase">PROGRESS</span>
       </button>
