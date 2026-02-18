@@ -93,13 +93,15 @@ const scheduleSync = (state: AppState) => {
   if (syncTimeout) clearTimeout(syncTimeout);
   
   syncTimeout = setTimeout(async () => {
-    useStore.getState().setSyncing(true);
+    const store = useStore.getState();
+    store.setSyncing(true);
+    // Passing the full state is safe now because firebaseService cleans it
     const success = await firebaseService.pushState(state.userCode!, state);
     if (success) {
-      useStore.getState().setLastSync(new Date().toISOString());
+      store.setLastSync(new Date().toISOString());
     }
-    useStore.getState().setSyncing(false);
-  }, 1000); // Debounce sync by 1 second
+    store.setSyncing(false);
+  }, 1000);
 };
 
 export const useStore = create<AppState & StoreActions>()(
@@ -113,6 +115,7 @@ export const useStore = create<AppState & StoreActions>()(
         // Load initial state from cloud
         const remoteState = await firebaseService.fetchState(code);
         if (remoteState) {
+          // Merge remote state while keeping the local userCode and auth status
           set({ ...remoteState, isAuthenticated: true, userCode: code });
         } else {
           // If new profile, push initial local defaults to cloud
@@ -128,10 +131,24 @@ export const useStore = create<AppState & StoreActions>()(
 
       applyRemoteState: (remoteState) => {
         const current = get();
-        // Prevent applying local state as "remote" update
         if (remoteState && remoteState.userCode === current.userCode) {
-          // Simple JSON string comparison to avoid infinite loop / unnecessary re-renders
-          if (JSON.stringify(remoteState) !== JSON.stringify(current)) {
+          // Create a clean comparison object to check if sync is needed
+          const remoteDataOnly: any = {};
+          const currentDataOnly: any = {};
+          
+          Object.keys(current).forEach(k => {
+            if (typeof (current as any)[k] !== 'function' && k !== 'isSyncing' && k !== 'lastSyncAt') {
+              currentDataOnly[k] = (current as any)[k];
+            }
+          });
+
+          Object.keys(remoteState).forEach(k => {
+             if (typeof (remoteState as any)[k] !== 'function' && k !== 'isSyncing' && k !== 'lastSyncAt') {
+               remoteDataOnly[k] = (remoteState as any)[k];
+             }
+          });
+
+          if (JSON.stringify(remoteDataOnly) !== JSON.stringify(currentDataOnly)) {
              set({ ...remoteState, isAuthenticated: true, userCode: current.userCode });
           }
         }

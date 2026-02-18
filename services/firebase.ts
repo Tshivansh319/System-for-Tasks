@@ -30,10 +30,16 @@ export const firebaseService = {
   /**
    * Pushes the current state to the cloud keyed by userCode
    */
-  async pushState(userCode: string, state: Partial<AppState>) {
+  async pushState(userCode: string, state: any) {
     try {
-      // Create a clean copy of the state for storage
-      const { isSyncing, lastSyncAt, ...cleanState } = state as any;
+      // Create a clean copy of the state for storage by removing non-serializable properties (functions)
+      const cleanState: any = {};
+      Object.keys(state).forEach(key => {
+        // Only include data properties, skip functions and internal sync flags
+        if (typeof state[key] !== 'function' && key !== 'isSyncing' && key !== 'lastSyncAt') {
+          cleanState[key] = state[key];
+        }
+      });
       
       const userRef = ref(database, 'users/' + encodeURIComponent(userCode));
       await set(userRef, {
@@ -72,7 +78,10 @@ export const firebaseService = {
     return onValue(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        onUpdate(data.state);
+        // Ensure we only pass the state part back to the store
+        if (data && data.state) {
+          onUpdate(data.state);
+        }
       }
     }, (error) => {
       console.error("Firebase Live Subscription Error:", error);

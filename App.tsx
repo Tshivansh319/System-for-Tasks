@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   Menu, 
@@ -114,12 +115,13 @@ const App: React.FC = () => {
   const allQuests = [...store.permanentQuests, ...store.temporaryQuests];
   const columns = Math.ceil(allQuests.length / 7) || 1;
   const gridTemplateColumns = columns === 1 
-    ? 'repeat(1, minmax(350px, 500px))' 
-    : `repeat(${columns}, minmax(300px, 1fr))`;
+    ? 'repeat(1, minmax(0, 1fr))' 
+    : `repeat(${columns}, minmax(0, 1fr))`;
 
-  let textSize = 'text-[13px]';
-  if (columns === 2) textSize = 'text-[12px]';
-  if (columns >= 3) textSize = 'text-[11px]';
+  // Decreased text sizes for mobile specifically
+  let textSize = 'text-[10px] sm:text-[13px]';
+  if (columns === 2) textSize = 'text-[9px] sm:text-[12px]';
+  if (columns >= 3) textSize = 'text-[8px] sm:text-[11px]';
 
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center relative overflow-hidden p-2">
@@ -164,19 +166,19 @@ const App: React.FC = () => {
           
           {/* PLAYER STATUS HEADER */}
           <div className="flex flex-col items-center gap-1.5 mb-4">
-            <h1 className="font-orbitron text-3xl font-black text-white tracking-[0.5em] uppercase neon-text leading-none mb-1">
+            <h1 className="font-orbitron text-2xl sm:text-3xl font-black text-white tracking-[0.4em] sm:tracking-[0.5em] uppercase neon-text leading-none mb-1">
               PLAYER STATUS
             </h1>
             
-            <div className="flex flex-wrap justify-center gap-x-10 gap-y-1 text-[13px] font-bold uppercase tracking-[0.2em] text-zinc-200">
+            <div className="flex flex-wrap justify-center gap-x-6 sm:gap-x-10 gap-y-1 text-[11px] sm:text-[13px] font-bold uppercase tracking-[0.2em] text-zinc-200">
               <div className="flex items-center gap-2">LEVEL: <span className="text-cyan-400 font-orbitron">{store.level}</span></div>
               <div className="flex items-center gap-2">RANK: <span className="text-cyan-400 font-orbitron">{rank}</span></div>
               <div className="flex items-center gap-2">XP: <span className="text-cyan-400 font-orbitron">{Math.floor(store.xp)} / {requiredXP}</span></div>
-              <div className="flex items-center gap-2">STREAK: <span className="text-cyan-400 font-orbitron">{store.streak.current}D | {store.streak.longest}D</span> 🔥</div>
+              <div className="flex items-center gap-2">STREAK: <span className="text-cyan-400 font-orbitron">{store.streak.current}D</span> 🔥</div>
             </div>
 
             <div className="w-full max-w-2xl px-2 mt-1">
-              <div className="h-4 w-full bg-zinc-950/40 border-2 border-cyan-500/60 relative overflow-hidden shadow-[0_0_12px_rgba(6,182,212,0.4)]">
+              <div className="h-3 sm:h-4 w-full bg-zinc-950/40 border-2 border-cyan-500/60 relative overflow-hidden shadow-[0_0_12px_rgba(6,182,212,0.4)]">
                 <div 
                   className="h-full bg-gradient-to-r from-cyan-700 via-cyan-400 to-white shadow-[0_0_25px_rgba(6,182,212,1)] transition-all duration-1000 ease-out"
                   style={{ width: `${xpProgress}%` }}
@@ -189,25 +191,24 @@ const App: React.FC = () => {
 
           {/* TODAY'S QUEST GRID */}
           <div className="flex flex-col gap-1.5 mb-3 flex-1 overflow-hidden">
-            <h3 className="text-[15px] font-bold text-cyan-400 tracking-[0.4em] uppercase pb-1 flex items-center justify-center gap-3">
-              <Target size={18} className="animate-pulse text-white shadow-[0_0_10px_#fff]" /> TODAY’S QUEST
+            <h3 className="text-[13px] sm:text-[15px] font-bold text-cyan-400 tracking-[0.4em] uppercase pb-1 flex items-center justify-center gap-3">
+              <Target size={16} className="animate-pulse text-white shadow-[0_0_10px_#fff]" /> TODAY’S QUEST
             </h3>
             
             <div className="flex justify-center h-full overflow-hidden">
               <div 
-                className="overflow-hidden h-full content-center"
+                className="overflow-hidden h-full content-center w-full max-w-[900px]"
                 style={{
                   display: 'grid',
                   gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
                   gridAutoFlow: 'column',
                   gridTemplateColumns: gridTemplateColumns,
-                  gap: '6px 30px',
-                  justifyContent: 'center',
-                  maxWidth: '100%'
+                  gap: '4px 10px', // Tighter gaps on mobile
+                  justifyContent: 'center'
                 }}
               >
                 {allQuests.map((quest) => (
-                  <label key={quest.id} className="quest-row flex items-center gap-4 cursor-pointer group">
+                  <label key={quest.id} className="quest-row flex items-center gap-3 sm:gap-4 cursor-pointer group">
                     <input 
                       type="checkbox" 
                       checked={quest.completed}
@@ -215,10 +216,11 @@ const App: React.FC = () => {
                       className="hidden"
                     />
                     <div className={`checkbox-hud flex-shrink-0 ${quest.completed ? 'checked' : ''}`}>
-                      {quest.completed && <Check className="text-white drop-shadow-[0_0_5px_#fff]" size={16} strokeWidth={4} />}
+                      {/* FIXED: Removed non-existent 'sm:size' prop from Check component */}
+                      {quest.completed && <Check className="text-white drop-shadow-[0_0_5px_#fff]" size={14} strokeWidth={4} />}
                     </div>
-                    <span className={`${textSize} font-bold tracking-[0.1em] uppercase transition-all truncate-hud flex-1 ${
-                      quest.completed ? 'text-zinc-500 line-through' : 'text-zinc-200 group-hover:text-cyan-400'
+                    <span className={`${textSize} font-bold tracking-[0.05em] sm:tracking-[0.1em] uppercase transition-all truncate-hud flex-1 ${
+                      quest.completed ? 'text-zinc-600 line-through' : 'text-zinc-200 group-hover:text-cyan-400'
                     }`}>
                       {quest.title}
                     </span>
@@ -232,19 +234,19 @@ const App: React.FC = () => {
 
           {/* CUSTOM QUEST INPUT */}
           <div className="flex flex-col gap-1.5 mt-2 pt-1">
-            <h3 className="text-[11px] font-bold text-cyan-400 tracking-[0.3em] uppercase flex items-center gap-2 justify-center">
+            <h3 className="text-[10px] sm:text-[11px] font-bold text-cyan-400 tracking-[0.3em] uppercase flex items-center gap-2 justify-center">
               <LayoutGrid size={12} /> ADD CUSTOM QUEST
             </h3>
             <div className="flex justify-center w-full">
-              <form onSubmit={handleAddCustomQuest} className="flex gap-3 w-full max-w-2xl">
+              <form onSubmit={handleAddCustomQuest} className="flex gap-2 sm:gap-3 w-full max-w-2xl">
                 <input 
                   type="text" 
                   value={newQuestTitle}
                   onChange={(e) => setNewQuestTitle(e.target.value)}
-                  placeholder="INPUT DIRECTIVE TITLE..."
-                  className="flex-1 bg-zinc-950/30 border-2 border-cyan-500/40 px-4 py-1.5 focus:outline-none focus:border-cyan-400 text-[11px] font-bold tracking-widest text-white uppercase placeholder:opacity-30 transition-all shadow-inner"
+                  placeholder="INPUT DIRECTIVE..."
+                  className="flex-1 bg-zinc-950/30 border-2 border-cyan-500/40 px-3 py-1 sm:py-1.5 focus:outline-none focus:border-cyan-400 text-[10px] sm:text-[11px] font-bold tracking-widest text-white uppercase placeholder:opacity-30 transition-all shadow-inner"
                 />
-                <button type="submit" className="bg-cyan-900/40 hover:bg-cyan-600/60 text-cyan-400 px-6 py-1.5 border-2 border-cyan-500/60 font-bold text-[10px] tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+                <button type="submit" className="bg-cyan-900/40 hover:bg-cyan-600/60 text-cyan-400 px-4 sm:px-6 py-1 sm:py-1.5 border-2 border-cyan-500/60 font-bold text-[9px] sm:text-[10px] tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)]">
                   INITIALIZE
                 </button>
               </form>
@@ -253,22 +255,22 @@ const App: React.FC = () => {
 
           {/* DISCIPLINE VALIDATION */}
           <div className="flex flex-col gap-1.5 mt-2 pt-1">
-            <h3 className="text-[11px] font-bold text-cyan-400 tracking-[0.3em] uppercase flex items-center gap-2 justify-center">
+            <h3 className="text-[10px] sm:text-[11px] font-bold text-cyan-400 tracking-[0.3em] uppercase flex items-center gap-2 justify-center">
               <RotateCcw size={12} /> DISCIPLINE CHECK
             </h3>
             <div className="flex justify-center w-full">
-              <div className="flex flex-col gap-1.5 w-full max-w-2xl overflow-y-auto max-h-[120px] custom-scroll pr-1">
+              <div className="flex flex-col gap-1 w-full max-w-2xl overflow-y-auto max-h-[100px] sm:max-h-[120px] custom-scroll pr-1">
                 {store.disciplineChecks.map(check => {
                   const today = new Date().toDateString();
                   const isFailedToday = check.lastFailedDate === today;
                   return (
-                    <div key={check.id} className="flex items-center justify-between group bg-zinc-950/20 p-0.5 px-5 border border-cyan-500/10 hover:border-cyan-500/30 transition-all rounded">
-                      <span className="text-[10px] font-bold text-zinc-300 tracking-widest uppercase group-hover:text-white transition-colors truncate pr-4">
+                    <div key={check.id} className="flex items-center justify-between group bg-zinc-950/20 p-0 px-3 sm:px-5 border border-cyan-500/10 hover:border-cyan-500/30 transition-all rounded h-[28px] sm:h-auto">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-zinc-300 tracking-widest uppercase group-hover:text-white transition-colors truncate pr-2">
                         {check.title}
                       </span>
                       <button 
                         onClick={() => store.triggerDisciplineFailure(check.id)}
-                        className={`px-6 py-1 border-2 border-cyan-500/40 text-cyan-400 font-black text-[9px] tracking-widest transition-all ${isFailedToday ? 'yes-button-active' : 'hover:bg-cyan-500/20'}`}
+                        className={`px-4 sm:px-6 py-0.5 sm:py-1 border-2 border-cyan-500/40 text-cyan-400 font-black text-[8px] sm:text-[9px] tracking-widest transition-all ${isFailedToday ? 'yes-button-active' : 'hover:bg-cyan-500/20'}`}
                       >
                         YES
                       </button>
@@ -285,10 +287,11 @@ const App: React.FC = () => {
       {/* PROGRESS BUTTON */}
       <button 
         onClick={() => setShowProgressChart(true)}
-        className="absolute bottom-6 right-6 flex items-center gap-3 px-6 py-3 system-panel border-2 border-cyan-500/60 hover:border-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.2)] group bg-zinc-950/40"
+        className="absolute bottom-4 sm:bottom-6 right-4 sm:right-6 flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3 system-panel border-2 border-cyan-500/60 hover:border-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.2)] group bg-zinc-950/40"
       >
+        {/* FIXED: Removed non-existent 'sm:size' prop from TrendingUp component */}
         <TrendingUp className="text-cyan-400 group-hover:scale-125 transition-transform" size={18} />
-        <span className="font-orbitron text-[10px] font-black text-cyan-400 tracking-[0.4em] uppercase">PROGRESS</span>
+        <span className="font-orbitron text-[9px] sm:text-[10px] font-black text-cyan-400 tracking-[0.3em] sm:tracking-[0.4em] uppercase">PROGRESS</span>
       </button>
 
       {/* SYSTEM MENU OVERLAY */}

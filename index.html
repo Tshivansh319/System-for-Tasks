@@ -127,9 +127,9 @@
 
       /* LARGE HIGH-SHINING HUD CHECKBOX */
       .checkbox-hud {
-        width: 28px; /* Increased size */
-        height: 28px;
-        border: 3px solid var(--neon-blue);
+        width: 20px; /* Smaller for mobile */
+        height: 20px; /* Smaller for mobile */
+        border: 2px solid var(--neon-blue);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -138,6 +138,14 @@
         background: rgba(6, 182, 212, 0.1);
         position: relative;
         box-shadow: 0 0 10px rgba(6, 182, 212, 0.3), inset 0 0 8px var(--neon-blue-glow);
+      }
+
+      @media (min-width: 640px) {
+        .checkbox-hud {
+          width: 28px;
+          height: 28px;
+          border-width: 3px;
+        }
       }
 
       .checkbox-hud.checked {
@@ -209,13 +217,21 @@
       ::-webkit-scrollbar { display: none; }
       
       .quest-row {
-        height: 40px; /* Reduced to ensure visibility */
-        min-height: 40px;
-        padding: 0 16px;
+        height: 32px; /* Reduced for mobile */
+        min-height: 32px;
+        padding: 0 12px;
         border-radius: 6px;
         background: rgba(6, 182, 212, 0.05);
         transition: all 0.2s ease;
         border: 1px solid rgba(6, 182, 212, 0.1);
+      }
+
+      @media (min-width: 640px) {
+        .quest-row {
+          height: 40px;
+          min-height: 40px;
+          padding: 0 16px;
+        }
       }
 
       .quest-row:hover {
