@@ -304,6 +304,11 @@ export const ManageStreakModal: React.FC<{ isOpen: boolean; onClose: () => void 
 
   if (!isOpen) return null;
 
+  // Format streak string based on individual discipline checks
+  const pipedStreak = store.disciplineChecks.length > 0 
+    ? store.disciplineChecks.map(c => c.currentStreak).join(' | ') 
+    : store.streak.current.toString();
+
   return (
     <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-zinc-950/85 backdrop-blur-md">
       <div className="bg-zinc-950 border-2 border-cyan-500/50 w-full max-w-2xl shadow-[0_0_60px_rgba(6,182,212,0.3)] overflow-hidden animate-in fade-in zoom-in duration-300 relative">
@@ -367,7 +372,7 @@ export const ManageStreakModal: React.FC<{ isOpen: boolean; onClose: () => void 
           </div>
           <div className="p-5 border border-cyan-500/40 bg-zinc-950/60 mb-8">
             <h5 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Combined Streaks Display:</h5>
-            <p className="text-[18px] font-black text-white uppercase tracking-widest">Streak: <span className="text-cyan-400">{store.streak.current} days | {store.streak.longest} days</span> 🔥</p>
+            <p className="text-[18px] font-black text-white uppercase tracking-widest">Streak: <span className="text-cyan-400">{pipedStreak}</span> 🔥</p>
           </div>
           <button onClick={onClose} className="w-full py-4 bg-cyan-500 text-black font-black tracking-[0.4em] text-[13px] uppercase hover:bg-cyan-400 transition-all shadow-[0_0_30px_rgba(6,182,212,0.4)]">SAVE ALL CHANGES</button>
         </div>

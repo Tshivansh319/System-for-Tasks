@@ -1,26 +1,20 @@
-
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { 
   Menu, 
-  X, 
   Check, 
-  Trophy, 
   RotateCcw, 
-  ChevronRight, 
   Target, 
   Volume2, 
   VolumeX, 
-  ArrowLeft, 
   Trash2, 
   LayoutGrid,
   Clock,
   Edit,
   LogOut,
-  ListTodo,
   TrendingUp,
-  Cloud,
-  CloudOff,
-  RefreshCw
+  CloudLightning,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { useStore, calculateRequiredXP, calculateRank } from './store';
 import { 
@@ -32,19 +26,21 @@ import {
   ProgressChartModal
 } from './components/Modals';
 import Login from './components/Login';
-import { firebaseService } from './services/firebase';
+import { supabaseService } from './services/supabase';
 
 const App: React.FC = () => {
   const store = useStore();
   const isAuthenticated = useStore((state) => state.isAuthenticated);
   const userCode = useStore((state) => state.userCode);
-  const isSyncing = useStore((state) => state.isSyncing);
-  const lastSyncAt = useStore((state) => state.lastSyncAt);
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [newQuestTitle, setNewQuestTitle] = useState('');
   const [showMenu, setShowMenu] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'table_missing'>('idle');
   
+  // Track the last timestamp we pushed to avoid infinite loops or stale updates
+  const lastPushedTimestamp = useRef<number>(0);
+
   // Modal States
   const [showProgressChart, setShowProgressChart] = useState(false);
   const [showManageProgress, setShowManageProgress] = useState(false);
@@ -53,6 +49,76 @@ const App: React.FC = () => {
   const [showManageStreak, setShowManageStreak] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showTemporaryHistory, setShowTemporaryHistory] = useState(false);
+
+  // PUSH local changes to Supabase (Debounced)
+  useEffect(() => {
+    if (!isAuthenticated || !userCode) return;
+    
+    // Only push if the local timestamp is actually NEWER than what we last pushed
+    if (store.lastUpdateTimestamp <= lastPushedTimestamp.current) return;
+
+    const syncPayload = {
+      permanentQuests: store.permanentQuests,
+      temporaryQuests: store.temporaryQuests,
+      xp: store.xp,
+      level: store.level,
+      streak: store.streak,
+      history: store.history,
+      disciplineChecks: store.disciplineChecks,
+      completedTemporaryHistory: store.completedTemporaryHistory,
+      lastResetDate: store.lastResetDate,
+      lastUpdateTimestamp: store.lastUpdateTimestamp, // Conflict Resolution Key
+    };
+
+    const timer = setTimeout(async () => {
+      setSyncStatus('syncing');
+      const result = await supabaseService.pushState(userCode, syncPayload);
+      
+      if (!result.success) {
+        if (result.error === 'PGRST205') {
+          setSyncStatus('table_missing');
+        } else {
+          setSyncStatus('error');
+        }
+      } else {
+        lastPushedTimestamp.current = store.lastUpdateTimestamp;
+        setTimeout(() => setSyncStatus('idle'), 1000);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [
+    isAuthenticated, 
+    userCode, 
+    store.permanentQuests, 
+    store.temporaryQuests, 
+    store.xp, 
+    store.level, 
+    store.streak,
+    store.history,
+    store.disciplineChecks,
+    store.completedTemporaryHistory,
+    store.lastResetDate,
+    store.lastUpdateTimestamp
+  ]);
+
+  // SUBSCRIBE to remote changes from Supabase Realtime
+  useEffect(() => {
+    if (!isAuthenticated || !userCode) return;
+    
+    const unsubscribe = supabaseService.subscribeToChanges(userCode, (remoteData) => {
+      // When applying remote update, our store logic will check the timestamp
+      store.applyRemoteUpdate(remoteData);
+      
+      // If the remote update was accepted, update our 'lastPushed' to match
+      // so we don't immediately push it back to the server
+      if (remoteData.lastUpdateTimestamp > lastPushedTimestamp.current) {
+        lastPushedTimestamp.current = remoteData.lastUpdateTimestamp;
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [isAuthenticated, userCode, store.applyRemoteUpdate]);
 
   const announceLevelUp = useCallback(() => {
     if (!store.voiceEnabled) return;
@@ -73,17 +139,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
-    let unsubscribe: any = null;
-
     if (isAuthenticated) {
       store.checkDailyReset();
-      
-      // Live Cloud Subscription
-      if (userCode) {
-        unsubscribe = firebaseService.subscribeToChanges(userCode, (remoteState) => {
-          store.applyRemoteState(remoteState);
-        });
-      }
     }
 
     const onLevelUp = () => announceLevelUp();
@@ -91,10 +148,9 @@ const App: React.FC = () => {
     
     return () => {
       clearInterval(timer);
-      if (unsubscribe) unsubscribe();
       window.removeEventListener('level-up', onLevelUp);
     };
-  }, [announceLevelUp, store.checkDailyReset, isAuthenticated, userCode]);
+  }, [announceLevelUp, store.checkDailyReset, isAuthenticated]);
 
   if (!isAuthenticated) {
     return <Login />;
@@ -118,10 +174,14 @@ const App: React.FC = () => {
     ? 'repeat(1, minmax(0, 1fr))' 
     : `repeat(${columns}, minmax(0, 1fr))`;
 
-  // SIGNIFICANTLY decreased text sizes for mobile as requested
-  let textSize = 'text-[7px] sm:text-[13px]';
-  if (columns === 2) textSize = 'text-[6px] sm:text-[12px]';
-  if (columns >= 3) textSize = 'text-[5px] sm:text-[11px]';
+  let textSize = 'text-[10px] sm:text-[13px]';
+  if (columns === 2) textSize = 'text-[9px] sm:text-[12px]';
+  if (columns >= 3) textSize = 'text-[8px] sm:text-[11px]';
+
+  // Format streak string based on individual discipline checks
+  const pipedStreak = store.disciplineChecks.length > 0 
+    ? store.disciplineChecks.map(c => c.currentStreak).join(' | ') 
+    : store.streak.current.toString();
 
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center relative overflow-hidden p-2">
@@ -135,18 +195,27 @@ const App: React.FC = () => {
           <Menu className="text-cyan-400" size={22} />
         </button>
 
-        {/* CLOUD SYNC HUD INDICATOR */}
-        <div className="system-panel border-cyan-500/20 px-3 py-1 flex items-center gap-3 bg-zinc-950/20 backdrop-blur-sm shadow-[0_0_10px_rgba(6,182,212,0.1)]">
-          {isSyncing ? (
-            <RefreshCw className="text-cyan-400 animate-spin" size={12} />
-          ) : (
-            <Cloud className="text-cyan-400/50" size={12} />
-          )}
+        <div className={`system-panel border-2 px-3 py-1 flex items-center gap-3 bg-zinc-950/20 backdrop-blur-sm shadow-[0_0_10px_rgba(6,182,212,0.1)] transition-colors ${syncStatus === 'table_missing' ? 'border-red-500' : 'border-cyan-500/20'}`}>
           <div className="flex flex-col">
-            <span className="text-[6px] font-black text-zinc-500 uppercase tracking-widest leading-none">DATABASE_LINK</span>
-            <span className="text-[8px] font-bold text-cyan-400/80 tracking-tighter uppercase leading-none mt-0.5">
-              {isSyncing ? 'UPLOADING...' : 'LIVE'}
-            </span>
+            <span className="text-[6px] font-black text-zinc-500 uppercase tracking-widest leading-none">NEURAL_LINK</span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {syncStatus === 'syncing' ? (
+                <RefreshCw size={8} className="text-amber-400 animate-spin" />
+              ) : syncStatus === 'table_missing' || syncStatus === 'error' ? (
+                <AlertCircle size={8} className="text-red-500" />
+              ) : (
+                <CloudLightning size={8} className="text-cyan-400" />
+              )}
+              <span className={`text-[8px] font-bold tracking-tighter uppercase leading-none transition-colors ${
+                syncStatus === 'syncing' ? 'text-amber-400' : 
+                syncStatus === 'table_missing' ? 'text-red-500' :
+                syncStatus === 'error' ? 'text-red-400' : 'text-cyan-400/80'
+              }`}>
+                {syncStatus === 'syncing' ? 'SYNCING...' : 
+                 syncStatus === 'table_missing' ? 'DB_TABLE_MISSING' :
+                 syncStatus === 'error' ? 'SYNC_ERROR' : 'ONLINE_SYNC'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -162,6 +231,15 @@ const App: React.FC = () => {
 
       {/* SYSTEM MAIN MODULE */}
       <main className="w-full flex items-center justify-center h-full">
+        {syncStatus === 'table_missing' && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[100] bg-red-950/80 border-2 border-red-500 p-4 text-center max-w-sm animate-pulse">
+            <h4 className="text-red-500 font-orbitron font-black text-sm uppercase tracking-widest mb-1">Database Error</h4>
+            <p className="text-red-200 text-[10px] font-bold uppercase tracking-widest">
+              Table 'user_states' not found in your Supabase project. Run the SQL fix in your dashboard to enable cross-device sync.
+            </p>
+          </div>
+        )}
+
         <div className="main-frame p-4 md:p-8 animate-in fade-in zoom-in duration-500 bg-transparent">
           
           {/* PLAYER STATUS HEADER */}
@@ -174,7 +252,7 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2">LEVEL: <span className="text-cyan-400 font-orbitron">{store.level}</span></div>
               <div className="flex items-center gap-2">RANK: <span className="text-cyan-400 font-orbitron">{rank}</span></div>
               <div className="flex items-center gap-2">XP: <span className="text-cyan-400 font-orbitron">{Math.floor(store.xp)} / {requiredXP}</span></div>
-              <div className="flex items-center gap-2">STREAK: <span className="text-cyan-400 font-orbitron">{store.streak.current}D</span> 🔥</div>
+              <div className="flex items-center gap-2">STREAK: <span className="text-cyan-400 font-orbitron">{pipedStreak}</span> 🔥</div>
             </div>
 
             <div className="w-full max-w-2xl px-2 mt-1">
@@ -203,23 +281,23 @@ const App: React.FC = () => {
                   gridTemplateRows: 'repeat(7, minmax(0, 1fr))',
                   gridAutoFlow: 'column',
                   gridTemplateColumns: gridTemplateColumns,
-                  gap: '2px 8px', // Tighter gaps for micro text
+                  gap: '4px 10px',
                   justifyContent: 'center'
                 }}
               >
                 {allQuests.map((quest) => (
-                  <label key={quest.id} className="quest-row flex items-center gap-2 sm:gap-4 cursor-pointer group">
+                  <label key={quest.id} className="quest-row flex items-center gap-3 sm:gap-4 cursor-pointer group">
                     <input 
                       type="checkbox" 
                       checked={quest.completed}
                       onChange={() => store.toggleQuest(quest.id, quest.type)}
                       className="hidden"
                     />
-                    <div className={`checkbox-hud flex-shrink-0 ${quest.completed ? 'checked' : ''}`} style={{ width: '14px', height: '14px' }}>
-                      {quest.completed && <Check className="text-white drop-shadow-[0_0_5px_#fff]" size={10} strokeWidth={4} />}
+                    <div className={`checkbox-hud flex-shrink-0 ${quest.completed ? 'checked' : ''}`}>
+                      {quest.completed && <Check className="text-white drop-shadow-[0_0_5px_#fff]" size={14} strokeWidth={4} />}
                     </div>
-                    <span className={`${textSize} font-bold tracking-[0.02em] sm:tracking-[0.1em] uppercase transition-all truncate-hud flex-1 ${
-                      quest.completed ? 'text-zinc-700 line-through' : 'text-zinc-200 group-hover:text-cyan-400'
+                    <span className={`${textSize} font-bold tracking-[0.05em] sm:tracking-[0.1em] uppercase transition-all truncate-hud flex-1 ${
+                      quest.completed ? 'text-zinc-600 line-through' : 'text-zinc-200 group-hover:text-cyan-400'
                     }`}>
                       {quest.title}
                     </span>
@@ -323,7 +401,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* GLOBAL MODALS */}
       <ManageProgressModal isOpen={showManageProgress} onClose={() => setShowManageProgress(false)} />
       <ManageQuestsModal isOpen={showManagePermanent} onClose={() => setShowManagePermanent(false)} type="permanent" />
       <ManageQuestsModal isOpen={showManageTemporary} onClose={() => setShowManageTemporary(false)} type="temporary" />

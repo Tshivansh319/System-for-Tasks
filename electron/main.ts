@@ -1,5 +1,7 @@
-const { app, BrowserWindow } = require('electron');
-const path = require('path');
+// Use ES module imports to resolve 'require' name error in TypeScript and follow modern standards
+import { app, BrowserWindow } from 'electron';
+// Import Node.js path module using ES module syntax
+import * as path from 'path';
 
 function createWindow() {
   const win = new BrowserWindow({

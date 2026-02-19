@@ -1,20 +1,77 @@
+import { createClient } from '@supabase/supabase-js';
 
-import { AppState } from '../types';
+// User provided credentials from their project
+const SUPABASE_URL = 'https://ffwsdoxebdrbxttnqzvn.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_1Sa9g7MbyW5CSuZm9a2G3g_wsXNYUaY';
 
-/**
- * Placeholder for Supabase logic. 
- * Real implementation would use @supabase/supabase-js 
- * and env variables: process.env.SUPABASE_URL, process.env.SUPABASE_KEY
- */
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-export const syncToCloud = async (state: Partial<AppState>) => {
-  console.log("Syncing to cloud...", state);
-  // Simulating network delay
-  await new Promise(r => setTimeout(r, 800));
-  return true;
-};
+export const supabaseService = {
+  async pushState(userCode: string, state: any) {
+    if (!userCode) return { success: false, error: null };
+    try {
+      const { error } = await supabase
+        .from('user_states')
+        .upsert({ 
+          id: userCode, 
+          state: state, 
+          updated_at: new Date().toISOString() 
+        }, { onConflict: 'id' });
+      
+      if (error) throw error;
+      return { success: true, error: null };
+    } catch (e: any) {
+      console.error("Supabase Push Error:", e);
+      return { success: false, error: e.code || e.message };
+    }
+  },
 
-export const fetchFromCloud = async () => {
-  // Simulating fetch
-  return null;
+  async fetchState(userCode: string) {
+    if (!userCode) return null;
+    try {
+      const { data, error } = await supabase
+        .from('user_states')
+        .select('state')
+        .eq('id', userCode)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data ? data.state : null;
+    } catch (e) {
+      console.error("Supabase Fetch Error:", e);
+      return null;
+    }
+  },
+
+  subscribeToChanges(userCode: string, callback: (data: any) => void) {
+    if (!userCode) return () => {};
+
+    // Standard Realtime channel - Listen to ALL changes (INSERT/UPDATE/DELETE)
+    // for this specific user code to ensure multi-device parity.
+    const channel = supabase
+      .channel(`sync-${userCode}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', 
+          schema: 'public',
+          table: 'user_states',
+          filter: `id=eq.${userCode}`,
+        },
+        (payload) => {
+          if (payload.new && (payload.new as any).state) {
+            callback((payload.new as any).state);
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[SYSTEM] Neural link established for user: ${userCode}`);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }
 };

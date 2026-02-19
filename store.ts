@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { AppState, Quest, Streak, DayProgress, CompletedQuestHistory, DisciplineCheck } from './types';
-import { firebaseService } from './services/firebase';
+import { AppState, Quest, Streak, CompletedQuestHistory, DisciplineCheck } from './types';
+import { supabaseService } from './services/supabase';
 
 interface StoreActions {
-  authenticate: (code: string) => void;
+  authenticate: (code: string) => Promise<void>;
   logout: () => void;
   addQuest: (title: string, type: 'permanent' | 'temporary') => void;
   removeQuest: (id: string, type: 'permanent' | 'temporary') => void;
@@ -24,9 +24,8 @@ interface StoreActions {
   resetDayManual: () => void; 
   updateStreakManual: (val: number) => void;
   resetProgressAll: () => void;
-  setSyncing: (val: boolean) => void;
-  setLastSync: (val: string) => void;
-  applyRemoteState: (state: Partial<AppState>) => void;
+  
+  applyRemoteUpdate: (data: any) => void;
 }
 
 export const calculateRequiredXP = (level: number) => 100 + (level - 1) * 30;
@@ -80,28 +79,8 @@ const initialState: AppState = {
   disciplineBroken: false,
   voiceEnabled: true,
   lastResetDate: new Date().toDateString(),
-  isSyncing: false,
-  lastSyncAt: null,
   history: {},
-};
-
-let syncTimeout: any = null;
-
-const scheduleSync = (state: AppState) => {
-  if (!state.isAuthenticated || !state.userCode) return;
-  
-  if (syncTimeout) clearTimeout(syncTimeout);
-  
-  syncTimeout = setTimeout(async () => {
-    const store = useStore.getState();
-    store.setSyncing(true);
-    // Passing the full state is safe now because firebaseService cleans it
-    const success = await firebaseService.pushState(state.userCode!, state);
-    if (success) {
-      store.setLastSync(new Date().toISOString());
-    }
-    store.setSyncing(false);
-  }, 1000);
+  lastUpdateTimestamp: Date.now(),
 };
 
 export const useStore = create<AppState & StoreActions>()(
@@ -110,47 +89,31 @@ export const useStore = create<AppState & StoreActions>()(
       ...initialState,
 
       authenticate: async (code) => {
-        set({ isAuthenticated: true, userCode: code, isSyncing: true });
-        
-        // Load initial state from cloud
-        const remoteState = await firebaseService.fetchState(code);
-        if (remoteState) {
-          // Merge remote state while keeping the local userCode and auth status
-          set({ ...remoteState, isAuthenticated: true, userCode: code });
-        } else {
-          // If new profile, push initial local defaults to cloud
-          scheduleSync(get());
+        set({ isAuthenticated: true, userCode: code });
+        const remoteData = await supabaseService.fetchState(code);
+        if (remoteData) {
+          set((state) => ({ ...state, ...remoteData, isAuthenticated: true, userCode: code }));
         }
-        
-        set({ isSyncing: false, lastSyncAt: new Date().toISOString() });
       },
 
       logout: () => {
         set({ ...initialState, isAuthenticated: false, userCode: null });
       },
 
-      applyRemoteState: (remoteState) => {
-        const current = get();
-        if (remoteState && remoteState.userCode === current.userCode) {
-          // Create a clean comparison object to check if sync is needed
-          const remoteDataOnly: any = {};
-          const currentDataOnly: any = {};
-          
-          Object.keys(current).forEach(k => {
-            if (typeof (current as any)[k] !== 'function' && k !== 'isSyncing' && k !== 'lastSyncAt') {
-              currentDataOnly[k] = (current as any)[k];
-            }
-          });
-
-          Object.keys(remoteState).forEach(k => {
-             if (typeof (remoteState as any)[k] !== 'function' && k !== 'isSyncing' && k !== 'lastSyncAt') {
-               remoteDataOnly[k] = (remoteState as any)[k];
-             }
-          });
-
-          if (JSON.stringify(remoteDataOnly) !== JSON.stringify(currentDataOnly)) {
-             set({ ...remoteState, isAuthenticated: true, userCode: current.userCode });
-          }
+      applyRemoteUpdate: (data) => {
+        if (!data || !data.lastUpdateTimestamp) return;
+        const state = get();
+        
+        // CRITICAL: Conflict Resolution
+        // Only accept remote data if it is strictly newer than our current local data
+        if (data.lastUpdateTimestamp > state.lastUpdateTimestamp) {
+          console.log("[SYSTEM] Applying remote update. Incoming timestamp is newer.");
+          set((state) => ({
+            ...state,
+            ...data
+          }));
+        } else {
+          console.log("[SYSTEM] Ignoring stale remote update.");
         }
       },
 
@@ -163,26 +126,31 @@ export const useStore = create<AppState & StoreActions>()(
           createdAt: new Date().toISOString(),
         };
         if (type === 'permanent') {
-          set((state) => ({ permanentQuests: [...state.permanentQuests, newQuest] }));
+          set((state) => ({ 
+            permanentQuests: [...state.permanentQuests, newQuest],
+            lastUpdateTimestamp: Date.now()
+          }));
         } else {
-          set((state) => ({ temporaryQuests: [...state.temporaryQuests, newQuest] }));
+          set((state) => ({ 
+            temporaryQuests: [...state.temporaryQuests, newQuest],
+            lastUpdateTimestamp: Date.now()
+          }));
         }
-        scheduleSync(get());
       },
 
       removeQuest: (id, type) => {
         set((state) => ({
           permanentQuests: state.permanentQuests.filter((q) => q.id !== id),
           temporaryQuests: state.temporaryQuests.filter((q) => q.id !== id),
+          lastUpdateTimestamp: Date.now()
         }));
-        scheduleSync(get());
       },
 
       editQuest: (id, newTitle) => {
         set((state) => ({
-          permanentQuests: state.permanentQuests.map((q) => q.id === id ? { ...q, title: newTitle } : q)
+          permanentQuests: state.permanentQuests.map((q) => q.id === id ? { ...q, title: newTitle } : q),
+          lastUpdateTimestamp: Date.now()
         }));
-        scheduleSync(get());
       },
 
       addDisciplineCheck: (title, penaltyType, penaltyValue) => {
@@ -194,22 +162,26 @@ export const useStore = create<AppState & StoreActions>()(
           currentStreak: 0,
           lastFailedDate: null
         };
-        set(state => ({ disciplineChecks: [...state.disciplineChecks, newCheck] }));
-        scheduleSync(get());
+        set(state => ({ 
+          disciplineChecks: [...state.disciplineChecks, newCheck],
+          lastUpdateTimestamp: Date.now()
+        }));
       },
 
       removeDisciplineCheck: (id) => {
-        set(state => ({ disciplineChecks: state.disciplineChecks.filter(c => c.id !== id) }));
-        scheduleSync(get());
+        set(state => ({ 
+          disciplineChecks: state.disciplineChecks.filter(c => c.id !== id),
+          lastUpdateTimestamp: Date.now()
+        }));
       },
 
       updateDisciplineCheck: (id, title, penaltyType, penaltyValue) => {
         set(state => ({
           disciplineChecks: state.disciplineChecks.map(c => 
             c.id === id ? { ...c, title, penaltyType, penaltyValue } : c
-          )
+          ),
+          lastUpdateTimestamp: Date.now()
         }));
-        scheduleSync(get());
       },
 
       triggerDisciplineFailure: (id) => {
@@ -243,11 +215,11 @@ export const useStore = create<AppState & StoreActions>()(
               level: newLevel,
               streak: 0
             }
-          }
+          },
+          lastUpdateTimestamp: Date.now()
         });
 
         window.dispatchEvent(new CustomEvent('xp-penalty'));
-        scheduleSync(get());
       },
 
       toggleVoice: () => set(state => ({ voiceEnabled: !state.voiceEnabled })),
@@ -269,22 +241,21 @@ export const useStore = create<AppState & StoreActions>()(
           return q;
         });
 
-        if (type === 'permanent') {
-          set({ permanentQuests: updateList(state.permanentQuests) });
-        } else {
-          set({ temporaryQuests: updateList(state.temporaryQuests) });
-          if (toggledQuest && toggledQuest.completed) {
-            const historyEntry: CompletedQuestHistory = {
-              id: crypto.randomUUID(),
-              title: toggledQuest.title,
-              completedAt: now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-            };
-            set(s => ({ completedTemporaryHistory: [historyEntry, ...s.completedTemporaryHistory] }));
-          }
+        const newPermanent = type === 'permanent' ? updateList(state.permanentQuests) : state.permanentQuests;
+        const newTemporary = type === 'temporary' ? updateList(state.temporaryQuests) : state.temporaryQuests;
+        
+        let newCompletedHistory = state.completedTemporaryHistory;
+        if (type === 'temporary' && toggledQuest && toggledQuest.completed) {
+          const historyEntry: CompletedQuestHistory = {
+            id: crypto.randomUUID(),
+            title: toggledQuest.title,
+            completedAt: now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+          };
+          newCompletedHistory = [historyEntry, ...state.completedTemporaryHistory];
         }
 
-        let newXP = get().xp + xpGained;
-        let newLevel = get().level;
+        let newXP = state.xp + xpGained;
+        let newLevel = state.level;
         const reqXP = calculateRequiredXP(newLevel);
         
         if (newXP >= reqXP) {
@@ -301,22 +272,25 @@ export const useStore = create<AppState & StoreActions>()(
           }
         }
 
-        const currentHistory = get().history[today] || { completedCount: 0, xpGained: 0, level: 1, streak: 0 };
+        const currentHistory = state.history[today] || { completedCount: 0, xpGained: 0, level: 1, streak: 0 };
+        
         set({
+          permanentQuests: newPermanent,
+          temporaryQuests: newTemporary,
+          completedTemporaryHistory: newCompletedHistory,
           xp: newXP,
           level: newLevel,
           history: {
-            ...get().history,
+            ...state.history,
             [today]: {
               completedCount: Math.max(0, currentHistory.completedCount + (xpGained > 0 ? 1 : -1)),
               xpGained: Math.max(0, currentHistory.xpGained + xpGained),
               level: newLevel,
-              streak: get().streak.current
+              streak: state.streak.current
             }
-          }
+          },
+          lastUpdateTimestamp: Date.now() // Bump timestamp on every interaction
         });
-        
-        scheduleSync(get());
       },
 
       breakDiscipline: () => {
@@ -356,12 +330,22 @@ export const useStore = create<AppState & StoreActions>()(
            updatedStreak.current = 0;
         }
 
+        // Logic for incrementing individual discipline streaks
+        const updatedDisciplineChecks = state.disciplineChecks.map(check => {
+          // If the check was NOT failed on the cycle we are resetting (state.lastResetDate), increment it.
+          if (check.lastFailedDate !== state.lastResetDate) {
+            return { ...check, currentStreak: check.currentStreak + 1 };
+          }
+          return check;
+        });
+
         const yesterdayHistory = state.history[yesterdayStr] || { completedCount: 0, xpGained: 0, level: 1, streak: 0 };
         
         set({
           lastResetDate: today,
           disciplineBroken: false,
           streak: updatedStreak,
+          disciplineChecks: updatedDisciplineChecks,
           permanentQuests: state.permanentQuests.map(q => ({ ...q, completed: false })),
           temporaryQuests: state.temporaryQuests.filter(q => !q.completed),
           history: {
@@ -377,9 +361,9 @@ export const useStore = create<AppState & StoreActions>()(
               level: state.level,
               streak: updatedStreak.current
             }
-          }
+          },
+          lastUpdateTimestamp: Date.now()
         });
-        scheduleSync(get());
       },
 
       resetDayWithXP: () => {
@@ -406,9 +390,9 @@ export const useStore = create<AppState & StoreActions>()(
           history: {
             ...get().history,
             [today]: { ...get().history[today], xpGained: 0, level: newLevel }
-          }
+          },
+          lastUpdateTimestamp: Date.now()
         });
-        scheduleSync(get());
       },
 
       resetDayManual: () => get().resetDayTasksOnly(),
@@ -419,9 +403,9 @@ export const useStore = create<AppState & StoreActions>()(
             ...state.streak,
             current: val,
             longest: Math.max(state.streak.longest, val)
-          }
+          },
+          lastUpdateTimestamp: Date.now()
         }));
-        scheduleSync(get());
       },
 
       resetProgressAll: () => {
@@ -434,16 +418,13 @@ export const useStore = create<AppState & StoreActions>()(
           disciplineChecks: DEFAULT_DISCIPLINE_CHECKS,
           disciplineBroken: false,
           permanentQuests: get().permanentQuests.map(q => ({ ...q, completed: false })),
-          temporaryQuests: []
+          temporaryQuests: [],
+          lastUpdateTimestamp: Date.now()
         });
-        scheduleSync(get());
       },
-
-      setSyncing: (val) => set({ isSyncing: val }),
-      setLastSync: (val) => set({ lastSyncAt: val }),
     }),
     {
-      name: 'solo-system-firebase-v1',
+      name: 'solo-system-local-v1',
       storage: createJSONStorage(() => localStorage),
     }
   )

@@ -47,7 +47,6 @@ export interface AppState {
   disciplineBroken: boolean;
   voiceEnabled: boolean;
   lastResetDate: string;
-  isSyncing: boolean;
-  lastSyncAt: string | null;
   history: Record<string, DayProgress>;
+  lastUpdateTimestamp: number; // For sync conflict resolution
 }

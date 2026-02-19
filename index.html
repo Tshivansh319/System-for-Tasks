@@ -34,7 +34,6 @@
 
       .font-orbitron { font-family: 'Orbitron', sans-serif; }
 
-      /* Technical Animated Background */
       .bg-hud-animated {
         position: fixed;
         inset: 0;
@@ -103,7 +102,7 @@
       }
 
       .main-frame {
-        background: rgba(13, 17, 23, 0.4); /* Transparent to show background */
+        background: rgba(13, 17, 23, 0.4);
         backdrop-filter: blur(12px);
         border: 3px solid var(--neon-blue);
         box-shadow: 
@@ -112,7 +111,7 @@
         position: relative;
         max-height: 96vh;
         width: 98%;
-        max-width: 1400px; /* Increased width */
+        max-width: 1400px;
         display: flex;
         flex-direction: column;
         animation: border-pulse 8s ease-in-out infinite;
@@ -125,10 +124,9 @@
         position: relative;
       }
 
-      /* LARGE HIGH-SHINING HUD CHECKBOX */
       .checkbox-hud {
-        width: 20px; /* Smaller for mobile */
-        height: 20px; /* Smaller for mobile */
+        width: 20px;
+        height: 20px;
         border: 2px solid var(--neon-blue);
         display: flex;
         align-items: center;
@@ -208,7 +206,6 @@
         animation: scanline 6s linear infinite;
       }
 
-      /* Strict No Scroll & Compact Quests */
       * { 
         scrollbar-width: none; 
         -ms-overflow-style: none; 
@@ -217,7 +214,7 @@
       ::-webkit-scrollbar { display: none; }
       
       .quest-row {
-        height: 32px; /* Reduced for mobile */
+        height: 32px;
         min-height: 32px;
         padding: 0 12px;
         border-radius: 6px;
@@ -250,17 +247,17 @@
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.574.0",
-    "zustand/": "https://esm.sh/zustand@^5.0.11/",
-    "zustand": "https://esm.sh/zustand@^5.0.11",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react/": "https://esm.sh/react@19.0.0/",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?deps=react@19.0.0",
+    "zustand": "https://esm.sh/zustand@5.0.1?deps=react@19.0.0",
+    "zustand/": "https://esm.sh/zustand@5.0.1/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.46.1",
     "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.1.0",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/database": "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js",
-    "firebase/analytics": "https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js",
-    "firebase/": "https://esm.sh/firebase@^12.9.0/"
+    "electron": "https://esm.sh/electron@^40.4.1",
+    "path": "https://esm.sh/path@^0.12.7"
   }
 }
 </script>
@@ -273,6 +270,7 @@
     </div>
     <div class="scanline"></div>
     <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
     <script>
       const container = document.getElementById('particle-container');
       for (let i = 0; i < 40; i++) {
