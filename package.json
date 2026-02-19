@@ -1,27 +1,38 @@
 {
   "name": "solo-leveling-system",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "version": "1.0.0",
+  "description": "Solo Leveling Productivity System",
+  "main": "electron/main.ts",
+  "author": "Solo Hunter",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "lucide-react": "0.460.0",
-    "zustand": "5.0.1",
-    "@supabase/supabase-js": "2.46.1",
-    "@capacitor/cli": "^8.1.0",
-    "electron": "^40.4.1",
-    "path": "^0.12.7"
+    "preview": "vite preview",
+    "electron:start": "electron .",
+    "electron:dev": "electron . --dev",
+    "electron:build": "npm run build && electron-builder"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "build": {
+    "appId": "com.solosystem.app",
+    "productName": "Solo System",
+    "copyright": "Copyright © 2024",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable"
+    }
   }
 }

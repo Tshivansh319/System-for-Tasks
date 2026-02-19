@@ -2,6 +2,11 @@
 import { app, BrowserWindow } from 'electron';
 // Import Node.js path module using ES module syntax
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// Fix: __dirname is not available in ES modules. We define it manually using import.meta.url.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -15,11 +20,17 @@ function createWindow() {
     backgroundColor: '#09090b',
   });
 
-  // In production, load the built index.html
-  // win.loadFile(path.join(__dirname, '../dist/index.html'));
-  
-  // In development:
-  win.loadURL('http://localhost:5173');
+  // Check if the app is running in development mode (unpackaged)
+  const isDev = !app.isPackaged;
+
+  if (isDev) {
+    // In development: Load from local dev server
+    win.loadURL('http://localhost:5173');
+  } else {
+    // In production: Load the built index.html from the dist folder
+    // Note: __dirname is the directory where this script is located (root/electron/)
+    win.loadFile(path.join(__dirname, '../dist/index.html'));
+  }
 }
 
 app.whenReady().then(createWindow);
