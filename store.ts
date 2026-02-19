@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { AppState, Quest, Streak, CompletedQuestHistory, DisciplineCheck } from './types';
-import { supabaseService } from './services/supabase';
+import { AppState, Quest, Streak, CompletedQuestHistory, DisciplineCheck } from './types.ts';
+import { supabaseService } from './services/supabase.ts';
 
 interface StoreActions {
   authenticate: (code: string) => Promise<void>;
@@ -104,16 +104,11 @@ export const useStore = create<AppState & StoreActions>()(
         if (!data || !data.lastUpdateTimestamp) return;
         const state = get();
         
-        // CRITICAL: Conflict Resolution
-        // Only accept remote data if it is strictly newer than our current local data
         if (data.lastUpdateTimestamp > state.lastUpdateTimestamp) {
-          console.log("[SYSTEM] Applying remote update. Incoming timestamp is newer.");
           set((state) => ({
             ...state,
             ...data
           }));
-        } else {
-          console.log("[SYSTEM] Ignoring stale remote update.");
         }
       },
 
@@ -289,7 +284,7 @@ export const useStore = create<AppState & StoreActions>()(
               streak: state.streak.current
             }
           },
-          lastUpdateTimestamp: Date.now() // Bump timestamp on every interaction
+          lastUpdateTimestamp: Date.now()
         });
       },
 
@@ -330,9 +325,7 @@ export const useStore = create<AppState & StoreActions>()(
            updatedStreak.current = 0;
         }
 
-        // Logic for incrementing individual discipline streaks
         const updatedDisciplineChecks = state.disciplineChecks.map(check => {
-          // If the check was NOT failed on the cycle we are resetting (state.lastResetDate), increment it.
           if (check.lastFailedDate !== state.lastResetDate) {
             return { ...check, currentStreak: check.currentStreak + 1 };
           }

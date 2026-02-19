@@ -16,7 +16,7 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
-import { useStore, calculateRequiredXP, calculateRank } from './store';
+import { useStore, calculateRequiredXP, calculateRank } from './store.ts';
 import { 
   ManageQuestsModal, 
   ManageStreakModal, 
@@ -24,15 +24,17 @@ import {
   ManageProgressModal,
   TemporaryQuestHistoryModal,
   ProgressChartModal
-} from './components/Modals';
-import Login from './components/Login';
-import { supabaseService } from './services/supabase';
+} from './components/Modals.tsx';
+import Login from './components/Login.tsx';
+import OfflinePage from './components/OfflinePage.tsx';
+import { supabaseService } from './services/supabase.ts';
 
 const App: React.FC = () => {
   const store = useStore();
   const isAuthenticated = useStore((state) => state.isAuthenticated);
   const userCode = useStore((state) => state.userCode);
 
+  const [isOnline, setIsOnline] = useState(window.navigator.onLine);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [newQuestTitle, setNewQuestTitle] = useState('');
   const [showMenu, setShowMenu] = useState(false);
@@ -50,9 +52,23 @@ const App: React.FC = () => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showTemporaryHistory, setShowTemporaryHistory] = useState(false);
 
+  // Connection monitoring
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // PUSH local changes to Supabase (Debounced)
   useEffect(() => {
-    if (!isAuthenticated || !userCode) return;
+    if (!isAuthenticated || !userCode || !isOnline) return;
     
     // Only push if the local timestamp is actually NEWER than what we last pushed
     if (store.lastUpdateTimestamp <= lastPushedTimestamp.current) return;
@@ -90,6 +106,7 @@ const App: React.FC = () => {
   }, [
     isAuthenticated, 
     userCode, 
+    isOnline,
     store.permanentQuests, 
     store.temporaryQuests, 
     store.xp, 
@@ -104,7 +121,7 @@ const App: React.FC = () => {
 
   // SUBSCRIBE to remote changes from Supabase Realtime
   useEffect(() => {
-    if (!isAuthenticated || !userCode) return;
+    if (!isAuthenticated || !userCode || !isOnline) return;
     
     const unsubscribe = supabaseService.subscribeToChanges(userCode, (remoteData) => {
       // When applying remote update, our store logic will check the timestamp
@@ -118,7 +135,7 @@ const App: React.FC = () => {
     });
     
     return () => unsubscribe();
-  }, [isAuthenticated, userCode, store.applyRemoteUpdate]);
+  }, [isAuthenticated, userCode, isOnline, store.applyRemoteUpdate]);
 
   const announceLevelUp = useCallback(() => {
     if (!store.voiceEnabled) return;
@@ -151,6 +168,10 @@ const App: React.FC = () => {
       window.removeEventListener('level-up', onLevelUp);
     };
   }, [announceLevelUp, store.checkDailyReset, isAuthenticated]);
+
+  if (!isOnline) {
+    return <OfflinePage />;
+  }
 
   if (!isAuthenticated) {
     return <Login />;
